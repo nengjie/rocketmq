@@ -67,6 +67,7 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
         this.namesrvController = namesrvController;
     }
 
+    // 处理请求
     @Override
     public RemotingCommand processRequest(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
@@ -88,6 +89,8 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
                 return this.deleteKVConfig(ctx, request);
             case RequestCode.QUERY_DATA_VERSION:
                 return queryBrokerTopicConfig(ctx, request);
+
+                // Broker注册请求
             case RequestCode.REGISTER_BROKER:
                 Version brokerVersion = MQVersion.value2Version(request.getVersion());
                 if (brokerVersion.ordinal() >= MQVersion.Version.V3_0_11.ordinal()) {
@@ -95,8 +98,11 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
                 } else {
                     return this.registerBroker(ctx, request);
                 }
+
             case RequestCode.UNREGISTER_BROKER:
                 return this.unregisterBroker(ctx, request);
+
+                // 获取路由信息
             case RequestCode.GET_ROUTEINFO_BY_TOPIC:
                 return this.getRouteInfoByTopic(ctx, request);
             case RequestCode.GET_BROKER_CLUSTER_INFO:
@@ -340,6 +346,7 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
         return response;
     }
 
+    // 路由发现的逻辑
     public RemotingCommand getRouteInfoByTopic(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
@@ -348,6 +355,7 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
 
         TopicRouteData topicRouteData = this.namesrvController.getRouteInfoManager().pickupTopicRouteData(requestHeader.getTopic());
 
+        // 如果找到路由信息，则
         if (topicRouteData != null) {
             if (this.namesrvController.getNamesrvConfig().isOrderMessageEnable()) {
                 String orderTopicConf =
@@ -363,6 +371,7 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
             return response;
         }
 
+        // 如果没有找到路由信息，则返回TOPIC_NOT_EXIST对应的码给客户端
         response.setCode(ResponseCode.TOPIC_NOT_EXIST);
         response.setRemark("No topic route info in name server for the topic: " + requestHeader.getTopic()
             + FAQUrl.suggestTodo(FAQUrl.APPLY_TOPIC_URL));

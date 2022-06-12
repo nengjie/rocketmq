@@ -50,9 +50,13 @@ public class RouteInfoManager {
     private final static long BROKER_CHANNEL_EXPIRED_TIME = 1000 * 60 * 2;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final HashMap<String/* topic */, List<QueueData>> topicQueueTable;
+    // broker的基础信息
     private final HashMap<String/* brokerName */, BrokerData> brokerAddrTable;
+    // 集群的地址信息
     private final HashMap<String/* clusterName */, Set<String/* brokerName */>> clusterAddrTable;
+    // broker的状态信息
     private final HashMap<String/* brokerAddr */, BrokerLiveInfo> brokerLiveTable;
+    // todo
     private final HashMap<String/* brokerAddr */, List<String>/* Filter Server */> filterServerTable;
 
     public RouteInfoManager() {
@@ -111,8 +115,10 @@ public class RouteInfoManager {
         RegisterBrokerResult result = new RegisterBrokerResult();
         try {
             try {
+                // 加锁，防止并发修改数据
                 this.lock.writeLock().lockInterruptibly();
 
+                // 先写集群数据
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
                 if (null == brokerNames) {
                     brokerNames = new HashSet<String>();
@@ -121,7 +127,7 @@ public class RouteInfoManager {
                 brokerNames.add(brokerName);
 
                 boolean registerFirst = false;
-
+                // 判断是否是第一次注册，如果是，则添加进来，否则，替换旧的
                 BrokerData brokerData = this.brokerAddrTable.get(brokerName);
                 if (null == brokerData) {
                     registerFirst = true;
@@ -142,6 +148,7 @@ public class RouteInfoManager {
                 String oldAddr = brokerData.getBrokerAddrs().put(brokerId, brokerAddr);
                 registerFirst = registerFirst || (null == oldAddr);
 
+                // 如果broker是主节点，并且topic配置信息发生变化或者初始化，则创建或者更新topic路由元数据
                 if (null != topicConfigWrapper
                     && MixAll.MASTER_ID == brokerId) {
                     if (this.isBrokerTopicConfigChanged(brokerAddr, topicConfigWrapper.getDataVersion())
@@ -156,6 +163,7 @@ public class RouteInfoManager {
                     }
                 }
 
+                // 更新心跳信息
                 BrokerLiveInfo prevBrokerLiveInfo = this.brokerLiveTable.put(brokerAddr,
                     new BrokerLiveInfo(
                         System.currentTimeMillis(),
@@ -431,6 +439,7 @@ public class RouteInfoManager {
         while (it.hasNext()) {
             Entry<String, BrokerLiveInfo> next = it.next();
             long last = next.getValue().getLastUpdateTimestamp();
+            // 如果超过120s未收到心跳包，则将broker移除
             if ((last + BROKER_CHANNEL_EXPIRED_TIME) < System.currentTimeMillis()) {
                 RemotingUtil.closeChannel(next.getValue().getChannel());
                 it.remove();
@@ -527,6 +536,7 @@ public class RouteInfoManager {
                         }
                     }
 
+                    // 移除主题队列中broker
                     if (removeBrokerName) {
                         Iterator<Entry<String, List<QueueData>>> itTopicQueueTable =
                             this.topicQueueTable.entrySet().iterator();

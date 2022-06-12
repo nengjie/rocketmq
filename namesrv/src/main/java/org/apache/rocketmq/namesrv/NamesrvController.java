@@ -74,26 +74,29 @@ public class NamesrvController {
     }
 
     public boolean initialize() {
-
+        // 加载kv配置
         this.kvConfigManager.load();
-
+        // 创建netty网络处理对象
         this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.brokerHousekeepingService);
-
+        // netty服务器的工作线程池
         this.remotingExecutor =
             Executors.newFixedThreadPool(nettyServerConfig.getServerWorkerThreads(), new ThreadFactoryImpl("RemotingExecutorThread_"));
-
+        // 注册NameServer的Processor 注册到RemotingServer中
         this.registerProcessor();
-
+        // 扫描未激活的broker
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
+            // 每间隔10S扫描一次，移除不活跃的Broker
             @Override
             public void run() {
                 NamesrvController.this.routeInfoManager.scanNotActiveBroker();
             }
         }, 5, 10, TimeUnit.SECONDS);
 
+        // 打印kv配置的定时任务
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
+            // 每间隔10min打印一次KV配置
             @Override
             public void run() {
                 NamesrvController.this.kvConfigManager.printAllPeriodically();

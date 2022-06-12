@@ -887,6 +887,7 @@ public class BrokerController {
             this.registerBrokerAll(true, false, true);
         }
 
+        // 发送心跳包，每隔10s扫描一次
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
